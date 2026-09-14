@@ -1,21 +1,23 @@
 ---
-name: software-design
+name: system-design
 description: >-
-  Authoritative guide on software design, modular architecture, and managing software complexity based on
-  John Ousterhout's "A Philosophy of Software Design". Use when designing architectures,
-  writing or refactoring code, conducting code reviews, evaluating abstractions, strategic programming,
-  or eliminating dependencies and obscurity.
+  Authoritative guide on system design, modular architecture, deep modules, and managing software
+  complexity based on John Ousterhout's "A Philosophy of Software Design". Use when designing
+  architectures, writing or refactoring modules, conducting code reviews, evaluating abstractions
+  and interfaces, strategic programming, or eliminating dependencies, obscurity, classitis, and
+  shallow wrappers.
 ---
 
-# Software Design & Strategic Programming
+# System Design & Strategic Programming
 
-This skill provides an authoritative operational framework for software design, managing complexity, and strategic programming, based on John Ousterhout's *A Philosophy of Software Design* (including Chapter 2 "The Nature of Software Complexity" and Chapter 3 "Working Code Isn't Enough").
+This skill provides an authoritative operational framework for system design, managing complexity, and strategic programming, based on John Ousterhout's *A Philosophy of Software Design* (Chapter 2 "The Nature of Software Complexity", Chapter 3 "Working Code Isn't Enough", and Chapter 4 "Modules Should Be Deep").
 
 Agents must apply these principles whenever planning architectures, writing new modules, implementing features or bug fixes, refactoring legacy code, or conducting design and code reviews.
 
 ### Detailed References
-* [Nature of Complexity Reference Sheet](file:///home/matthew/Dev/AGENT_ENGINE/.agents/skills/software-design/references/nature_of_complexity.md) (*Chapter 2*)
-* [Working Code Isn't Enough Reference Sheet](file:///home/matthew/Dev/AGENT_ENGINE/.agents/skills/software-design/references/working_code_isnt_enough.md) (*Chapter 3*)
+* [Nature of Complexity](./references/nature_of_complexity.md) (*Chapter 2*)
+* [Working Code Isn't Enough](./references/working_code_isnt_enough.md) (*Chapter 3*)
+* [Modules Should Be Deep](./references/modules-should-be-deep.md) (*Chapter 4*)
 
 ---
 
@@ -286,7 +288,123 @@ Whenever implementing a feature, bug fix, or refactoring in this codebase, follo
 
 ---
 
-## 8. Practical Review Checklist & Complexity Heuristics
+## 8. Modules Should Be Deep
+
+Based on Chapter 4 of *A Philosophy of Software Design*. Structure systems so a developer or agent only faces a small fraction of overall complexity at any time. Modules must interact, so the goal of modular design is to **minimize dependencies between modules**. If modules were fully independent, system complexity would equal the complexity of the single worst module.
+
+### Core Terminology
+
+| Term | Definition |
+| :--- | :--- |
+| **Module** | Any unit of code that pairs an **interface** with an **implementation** (functions, classes, subsystems, or network services). |
+| **Interface** | Everything a developer working in *another* module must know to use this module. Describes **what** it does, not **how**. |
+| **Implementation** | The code that fulfills the interface's promises. |
+| **Dependency** | A link such that a change in one module requires a change in another (signatures, call-order prerequisites). |
+| **Abstraction** | A simplified view that **omits unimportant details**. |
+| **False abstraction** | Omits details that are actually important, causing obscurity and bad assumptions. |
+| **Deep module** | Powerful functionality through a small, simple interface (high benefit-to-cost). |
+| **Shallow module** | Interface relatively complex compared to modest functionality (low benefit-to-cost). |
+| **Effective complexity** | Cognitive burden of an interface equals only its **commonly used features**, if advanced features stay unobtrusive. |
+| **Classitis** | Dogma that "classes are good, so more/smaller classes are always better," producing an explosion of shallow abstractions and boilerplate. |
+
+### Anatomy of an Interface
+
+An interface is **all** information a caller must know to use the module correctly:
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   MODULE INTERFACE                     │
+├───────────────────────────┬────────────────────────────┤
+│      FORMAL ELEMENTS      │     INFORMAL ELEMENTS      │
+│   (Enforced by Language)  │       (Documentation)      │
+├───────────────────────────┼────────────────────────────┤
+│ • Method signatures       │ • High-level behavior      │
+│ • Parameter names & types │   (e.g., "deletes a file") │
+│ • Return value types      │ • Usage constraints        │
+│ • Thrown exceptions       │   (e.g., call ordering)    │
+│ • Public variables        │ • Side effects             │
+└───────────────────────────┴────────────────────────────┘
+```
+
+* **Formal**: declared in code and checked by the language.
+* **Informal**: behavioral guarantees, ordering constraints, and side effects (usually larger and more complex than the formal part).
+* A clearly specified interface eliminates **unknown unknowns** by making caller requirements explicit.
+
+### Abstraction Failure Modes
+
+```
+                       ABSTRACTION ACCURACY
+                     ┌───────────────────────┐
+                     │ Well-Designed Module  │
+                     │ (Omits only what is   │
+                     │     unimportant)      │
+                     └──────────┬────────────┘
+           ┌────────────────────┴────────────────────┐
+           ▼                                         ▼
+┌───────────────────────────┐             ┌───────────────────────────┐
+│   Error 1: Over-Detail    │             │  Error 2: Under-Detail    │
+│  (Includes Unimportant)   │             │   (Omits Important)       │
+├───────────────────────────┤             ├───────────────────────────┤
+│ • Increases cognitive load│             │ • Leads to Obscurity      │
+│ • Clutters interface      │             │ • "False Abstraction"     │
+│ • Exposes internals       │             │ • Callers make bad        │
+│                           │             │   assumptions & errors    │
+└───────────────────────────┘             └───────────────────────────┘
+```
+
+* **Hide**: disk block allocation, physical layout, magnetron internals, transmission internals.
+* **Expose when important**: e.g. `fsync` cache-flush semantics for databases that must survive crashes.
+
+### Cost/Benefit Model
+
+Ousterhout visualizes modules as rectangles: **interface width = cost** (cognitive burden on callers); **implementation area = benefit** (functionality and hidden complexity).
+
+> Interfaces are good, but more, or larger, interfaces are not necessarily better.
+
+```
+        DEEP MODULE                        SHALLOW MODULE
+  (Best: high benefit, low cost)    (Poor: low benefit, high cost)
+
+       Interface (Cost)                   Interface (Cost)
+         [==========]               [==========================]
+        │          │               │                          │
+        │ Function-│               └──────────────────────────┘
+        │   ality  │                   Functionality (Benefit)
+        │ (Benefit)│
+        └──────────┘
+```
+
+**Canonical deep examples**
+* **Unix file I/O**: five core calls (`open`, `read`, `write`, `lseek`, `close`) hide hundreds of thousands of lines (layouts, permissions, scheduling, caching, hardware). Sequential access is default; random access is opt-in via `lseek`. The calls stayed stable while implementations changed for decades.
+* **Garbage collection**: the ultimate deep module — **no public interface**; it removes `free()`/`delete` from the system interface.
+
+**Shallow red flag**: interface complicated relative to the functionality provided. Small modules tend to be shallow. Example of a worthless wrapper:
+
+```java
+private void addNullValueForAttribute(String attribute) {
+    data.put(attribute, null);
+}
+```
+
+Zero abstraction (exposes the map), net complexity increase (extra name to memorize), and more documentation than implementation.
+
+### Classitis
+
+Do not fragment classes/methods solely because they exceed an arbitrary line count (e.g. 10). Isolated tiny classes look simple, but system complexity explodes: more names, constructors, cross-dependencies, and glue. Implementation complexity is replaced with **interface complexity**.
+
+### Design Principle: Make the Common Case Simple
+
+Interfaces should make the common case as simple as possible. Punishing the common case (e.g. Java I/O requiring `FileInputStream` + `BufferedInputStream` + `ObjectInputStream`) is a design failure: buffering is almost always required, so making it optional and manual causes silent performance bugs and discarded intermediate objects.
+
+* Provide the best common behavior **by default** (Unix: sequential access, automatic buffering).
+* Isolate edge cases behind unobtrusive constructors or config.
+* **Effective complexity** of an interface is only the complexity of everyday features, if advanced features stay out of the way.
+
+**Chapter 4 takeaway**: a deep module has a **narrow, simple interface** hiding a **broad, powerful implementation**. Maximize concealed internal complexity; minimize what the rest of the system must know.
+
+---
+
+## 9. Practical Review Checklist & Complexity Heuristics
 
 Before merging any pull request or finishing a task, verify against this combined checklist:
 
@@ -304,3 +422,7 @@ Before merging any pull request or finishing a task, verify against this combine
 | **Isolation ($t_p$)** | If this logic is inherently intricate, is it completely hidden behind a deep, simple API? | Seal the complex logic inside a dedicated subsystem so callers never see it. |
 | **Team Velocity** | Are you optimizing for how fast you finish today, or how easy it will be for the next engineer to modify it? | Prioritize long-term team modification ease over personal sprint speed. |
 | **10–20% Hygiene** | Did this work budget 10–20% of effort for interface refinement, types, and small refactors? | Perform the hygiene refactor before closing the task. |
+| **Deep vs Shallow** | Is the new unit a thin pass-through whose interface is as complex as its implementation? | Inline it, or hide real complexity behind a smaller interface. |
+| **Common Case Simple** | Does ordinary use require chaining wrappers, extra flags, or remembering optional steps? | Make the common path the default; isolate edge cases. |
+| **Classitis** | Did you split a class/method only to keep line counts small, adding names and glue? | Merge into a deeper module with one simple interface. |
+| **False Abstraction** | Does the interface omit important constraints (ordering, durability, side effects)? | Expose the important details; hide only the unimportant. |

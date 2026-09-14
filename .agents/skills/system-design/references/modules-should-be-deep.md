@@ -1,4 +1,5 @@
-# Reference Sheet: *A Philosophy of Software Design* (John Ousterhout)
+# Reference Sheet: Modules Should Be Deep
+*Based on Chapter 4 of "A Philosophy of Software Design" by John Ousterhout*
 
 ---
 
