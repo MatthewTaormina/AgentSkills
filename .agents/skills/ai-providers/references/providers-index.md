@@ -2,6 +2,8 @@
 
 Source: [https://openrouter.ai/providers](https://openrouter.ai/providers) plus OpenRouter provider slugs. Volume figures are marketplace throughput **through OpenRouter**, not the vendor’s global traffic. Re-fetch the live page before using volume as a capacity signal.
 
+**Which models, with descriptions and links:** [chat-agent-models.md](chat-agent-models.md), [image-models.md](image-models.md), [video-models.md](video-models.md), [audio-music-models.md](audio-music-models.md). IDs grouped by host: [models-by-provider.md](models-by-provider.md). The **Models** column below is only a count.
+
 OpenRouter provider page pattern: `https://openrouter.ai/provider/{slug}`
 
 Policy columns (**Trains**, **Retention**, **BYOK**) are **OpenRouter-reported**. Confirm on the vendor privacy/ToS URLs before a regulated deployment.

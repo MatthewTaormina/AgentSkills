@@ -1,11 +1,11 @@
 ---
 name: ai-providers
 description: >-
-  Knowledgebase of current AI API providers, models, documentation, pricing, privacy/retention,
-  and AI routers/gateways. Use when selecting models or vendors, comparing OpenAI, Anthropic,
-  Google, Mistral, DeepSeek, xAI/SpaceXAI, Groq, Together, Fireworks, Vertex, Bedrock, Azure,
-  OpenRouter, EUrouter, LiteLLM, Portkey, Vercel AI Gateway, Cloudflare, Kong, Helicone,
-  Requesty, or TrueFoundry, or when the user asks who hosts a model and what it costs.
+  Knowledgebase of current AI API providers and models (chat/agent, image, video, music/speech),
+  documentation links, pricing, privacy/retention, and routers/gateways. Use when selecting models
+  or vendors, comparing OpenAI, Anthropic, Google, Mistral, DeepSeek, xAI/SpaceXAI, Groq, Together,
+  Fireworks, Vertex, Bedrock, Azure, OpenRouter, EUrouter, LiteLLM, Portkey, Sora, Veo, FLUX, Lyria,
+  Kling, Runway, or when the user asks which model to use for chat, agents, image, video, or music.
 ---
 
 # AI Providers Knowledgebase
@@ -53,8 +53,17 @@ Need one key, many labs, automatic failover
 Need VPC, virtual keys, budgets, guardrails on *your* provider keys
   → Self-hosted / enterprise gateway: LiteLLM, Portkey, Kong, TrueFoundry.
 
-Need embeddings / STT / image / video only
-  → See specialized.md (Voyage, Deepgram, BFL, Recraft, Runway, …).
+Need a chat / coding / tool-calling agent
+  → chat-agent-models.md (GPT-6, Claude 5, Gemini 3.x, Grok, DeepSeek, Kimi, GLM, …).
+
+Need image generation or editing
+  → image-models.md (GPT Image, FLUX.2, Nano Banana, Recraft, Seedream, Grok Imagine, Krea).
+
+Need video generation
+  → video-models.md (Sora 2 Pro, Veo 3.1, Runway, Kling, Hailuo, Wan, Seedance, HeyGen).
+
+Need music or speech
+  → audio-music-models.md (Lyria 3 music; Fish/MiniMax/Qwen/Deepgram TTS; gpt-audio; ASR).
 ```
 
 ## Privacy cheat sheet (OpenRouter-reported, Sep 2026)
@@ -75,13 +84,25 @@ Full table: [providers-index.md](references/providers-index.md)
 
 ## Reference files
 
+**By modality (start here for “which model?”):**
+
+- [chat-agent-models.md](references/chat-agent-models.md) — agent/chat models with about-text, context, tools, pricing, OpenRouter + vendor links
+- [image-models.md](references/image-models.md) — image generation/editing
+- [video-models.md](references/video-models.md) — video generation
+- [audio-music-models.md](references/audio-music-models.md) — music (Lyria), TTS, realtime audio, transcription
+
+**By provider / host:**
+
 - [providers-index.md](references/providers-index.md) — every OpenRouter-listed provider (slug, HQ, trains, retention, BYOK, volume, model count)
-- [routers.md](references/routers.md) — OpenRouter, EUrouter, LiteLLM, Portkey, Vercel, Cloudflare, Kong, Helicone, Requesty, TrueFoundry, AISIX
+- [models-by-provider.md](references/models-by-provider.md) — complete OpenRouter model ID list per lab, cloud, and host
 - [labs.md](references/labs.md) — first-party model creators
 - [cloud-platforms.md](references/cloud-platforms.md) — Azure, Bedrock, Vertex, Alibaba, Tencent, Baidu, Cloudflare, GPU clouds
-- [inference-hosts.md](references/inference-hosts.md) — Groq, Together, Fireworks, DeepInfra, Cerebras, and other GPU marketplaces
-- [specialized.md](references/specialized.md) — embeddings, speech, image, video, coding-apply, confidential inference
+- [inference-hosts.md](references/inference-hosts.md) — Groq, Together, Fireworks, DeepInfra, Cerebras, and other hosts
+- [specialized.md](references/specialized.md) — embeddings, apply/morph, confidential inference (image/video/speech details live in the modality files)
+- [routers.md](references/routers.md) — OpenRouter, EUrouter, LiteLLM, Portkey, Vercel, Cloudflare, Kong, Helicone, Requesty, TrueFoundry, AISIX
+
+When the user asks **which models a provider hosts** or **which model for chat/image/video/music**, read the matching file above. Do not guess IDs from memory.
 
 ## Entry template (used in grouped files)
 
-Each researched provider records: OpenRouter slug, HQ/policy, official docs + pricing URLs, API base URL / env var, current model families, a **dated** flagship price snapshot, and when to pick it.
+Each researched provider records: OpenRouter slug, HQ/policy, official docs + pricing URLs, API base URL / env var, **OpenRouter model IDs**, a **dated** flagship price snapshot, and when to pick it.
