@@ -4,20 +4,23 @@ description: >-
   Authoritative guide on system design, modular architecture, deep modules, and managing software
   complexity based on John Ousterhout's "A Philosophy of Software Design". Use when designing
   architectures, writing or refactoring modules, conducting code reviews, evaluating abstractions
-  and interfaces, strategic programming, or eliminating dependencies, obscurity, classitis, and
-  shallow wrappers.
+  and interfaces, strategic programming, information hiding and leakage, avoiding temporal
+  decomposition, designing general-purpose (rather than over-specialized) modules, or eliminating
+  dependencies, obscurity, classitis, overexposure, and shallow wrappers.
 ---
 
 # System Design & Strategic Programming
 
-This skill provides an authoritative operational framework for system design, managing complexity, and strategic programming, based on John Ousterhout's *A Philosophy of Software Design* (Chapter 2 "The Nature of Software Complexity", Chapter 3 "Working Code Isn't Enough", and Chapter 4 "Modules Should Be Deep").
+This skill provides an authoritative operational framework for system design, managing complexity, and strategic programming, based on John Ousterhout's *A Philosophy of Software Design* (Chapter 2 "The Nature of Software Complexity", Chapter 3 "Working Code Isn't Enough", Chapter 4 "Modules Should Be Deep", Chapter 5 "Information Hiding and Leakage", and Chapter 6 "General-Purpose Modules are Deeper").
 
 Agents must apply these principles whenever planning architectures, writing new modules, implementing features or bug fixes, refactoring legacy code, or conducting design and code reviews.
 
 ### Detailed References
-* [Nature of Complexity](./references/nature_of_complexity.md) (*Chapter 2*)
-* [Working Code Isn't Enough](./references/working_code_isnt_enough.md) (*Chapter 3*)
+* [Nature of Complexity](./references/nature-of-complexity.md) (*Chapter 2*)
+* [Working Code Isn't Enough](./references/working-code-isnt-enough.md) (*Chapter 3*)
 * [Modules Should Be Deep](./references/modules-should-be-deep.md) (*Chapter 4*)
+* [Information Hiding and Leakage](./references/information-hiding-and-leakage.md) (*Chapter 5*)
+* [General-Purpose Modules are Deeper](./references/general-purpose-modules-are-deeper.md) (*Chapter 6*)
 
 ---
 
@@ -404,7 +407,149 @@ Interfaces should make the common case as simple as possible. Punishing the comm
 
 ---
 
-## 9. Practical Review Checklist & Complexity Heuristics
+## 9. Information Hiding and Leakage
+
+Based on Chapter 5 of *A Philosophy of Software Design*. The single most important technique for making modules **deep** is information hiding: a module should encapsulate as much design knowledge as possible inside its implementation while exposing a minimal interface.
+
+### The Principle
+
+Every module should hide internal facts that are not needed outside it. Callers interact with an abstract, high-level model; the mechanisms behind it stay invisible and freely refactorable.
+
+| Hide inside the module | Leave in the interface |
+| :--- | :--- |
+| Data structures (trees, hash tables, caches, internal representations) | High-level behavior and intent |
+| Low-level protocols & mechanics (file I/O, socket handling, wire formats) | Simple, cohesive operations the caller actually needs |
+| Algorithms & policies (eviction, parsing, optimization heuristics) | Tuning controls callers genuinely require |
+| Environmental assumptions (hardware, persistence, scheduling) | Defaults that "do the right thing" automatically |
+
+> [!WARNING]
+> **`private` ≠ hidden.** Marking a field private accomplishes nothing if a public getter, setter, or pass-through method re-exposes the underlying representation. Hiding is about what callers can *observe and depend on*, not about language keywords.
+
+### Information Leakage (the failure mode)
+
+Leakage occurs when **one design decision is reflected across multiple modules**, coupling them through hidden shared knowledge. If changing a single decision (a storage format, a protocol, a field name) forces synchronized edits in several classes, knowledge has leaked.
+
+```
+        ❌ LEAKED                      ✅ HIDDEN
+  ┌───────────┐  ┌───────────┐     ┌───────────┐  ┌───────────┐
+  │ Class A   │  │ Class B   │     │ Class A   │  │ Class B   │
+  │  knows    │  │  knows    │     │ owns the  │  │ uses a    │
+  │ format ───┼──┼─ format   │     │ format ───┼─▶│ high-level│
+  │ (implicit │  │ (change   │     │ (single   │  │ operation,│
+  │  coupling)│  │  breaks A)│     │  home)    │  │ no format │
+  └───────────┘  └───────────┘     └───────────┘  │ knowledge)│
+   Change one → break both                          └───────────┘
+```
+
+Two forms to watch for:
+* **Interface leakage** — the signature or return type itself reveals internals (e.g. `getParams()` returning the raw internal `Map`).
+* **Back-door leakage** — the more dangerous, pervasive kind: two classes silently depend on the same external knowledge (a file format, a serialization layout) without declaring it, so changes break them unexpectedly.
+
+**Remedies:** *Merge* tightly-coupled small classes into one cohesive module; or *extract* the shared knowledge into a dedicated module with a simple, high-level interface that hides the detail.
+
+### Temporal Decomposition (the anti-pattern)
+
+Splitting a system by **execution order** (`Reader → Parser → Validator → Writer`) rather than by knowledge ownership forces the same format knowledge to leak into every stage. Consecutive steps almost always share the same underlying representation, so slicing them apart guarantees leakage and produces shallow classes.
+
+**Solution:** decompose around **knowledge ownership**, not chronology. Group mechanisms that understand the same format or lifecycle (e.g. both reading *and* writing that format) into one class.
+
+```
+❌ SocketReader ──▶ RequestParser ──▶ ...   (both know HTTP framing)
+✅ HttpRequest  ── owns receiving AND parsing internally (framing isolated)
+```
+
+### Shallow vs. Deep Interface, concretely
+
+```java
+// ❌ Leaks the internal representation; caller must parse & null-check
+public Map<String,String> getParams() { return this.params; }
+String s = request.getParams().get("timeout");
+int timeout = (s != null) ? Integer.parseInt(s) : 30;
+
+// ✅ Deep: storage hidden, convenient typed domain operation, default built in
+public int getIntParameter(String name, int defaultValue) {
+    String val = params.get(name);
+    if (val == null) return defaultValue;
+    try { return Integer.parseInt(val); }
+    catch (NumberFormatException e) { return defaultValue; }
+}
+int timeout = request.getIntParameter("timeout", 30);
+```
+
+### Defaults are information hiding
+
+A sensible default lets the common case be trivial *and* keeps the configuration option invisible to most callers. Provide the standard behavior automatically (`Date`, `Content-Length`, `200 OK`); expose override methods only for the minority who genuinely need tuning.
+
+> [!IMPORTANT]
+> **When hiding goes too far (Overexposure is the mirror red flag).** Hiding is only correct when the information is *not needed outside*. If a caller legitimately needs control (cache size, retry count), expose it through a clean configuration interface. Never force users to understand rare mechanisms just to do an everyday task.
+>
+> Hide within a class too: keep private helpers focused on one capability, and minimize how many methods touch each instance variable.
+
+---
+
+## 10. General-Purpose Modules are Deeper
+
+Based on Chapter 6 of *A Philosophy of Software Design*. **Over-specialization is arguably the single greatest source of unnecessary complexity.** A general-purpose interface is deeper than a specialized one—even when it has exactly one caller today.
+
+### The Paradox of Generality
+
+Implementing a class with a general-purpose interface usually takes *less* code, hides information better, and is easier to maintain than a specialized interface—because specialized APIs leak higher-level application logic down into lower layers.
+
+### The Golden Rule: "Somewhat General-Purpose"
+
+> **Functionality reflects current needs; the interface does not.**
+
+* **Functionality** — implement only what is required *today*. Do not build speculative domain features for hypothetical futures.
+* **Interface** — express operations in clean, fundamental **domain primitives**, never in the vocabulary of a specific caller, UI event, or current workflow.
+
+| Approach | Interface style | Implementation | Coupling / reuse |
+| :--- | :--- | :--- | :--- |
+| **Over-specialized** | Mirrors today's UI triggers (`backspace()`, `deleteSelection()`) | Sprawls into many shallow methods | Tight coupling, leaky, zero reuse |
+| **Somewhat general-purpose** *(target)* | Generic primitives (`insert(pos, text)`, `delete(start, end)`) | Lowest code volume and cognitive load | Deep, reusable, low coupling |
+| **Over-generalized** | Micro-operations (character-by-character only) | Caller writes verbose loops/boilerplate | Awkward, high caller burden |
+
+### Push specialization up or down
+
+Specialized code can't vanish; isolate it from the general-purpose core:
+
+```
+┌───────────────────────────────────────────┐
+│ SPECIALIZED — UP (Application / UI layer) │  workflows, interactions, policy
+└───────────────────────┬───────────────────┘
+                        │ uses
+┌───────────────────────▼───────────────────┐
+│        GENERAL-PURPOSE CORE (engine)      │  text buffer, History, OS kernel
+└───────────────────────┬───────────────────┘
+                        │ calls via generic API
+┌───────────────────────▼───────────────────┐
+│ SPECIALIZED — DOWN (adapters / drivers)   │  device drivers, format codecs
+└───────────────────────────────────────────┘
+```
+
+* **Up:** the UI computes the range (`cursor-1 … cursor`) and calls the generic `delete(start, end)`—the engine never learns what "Backspace" means.
+* **Down:** the OS defines generic `read_block`/`write_block`; each controller implements its proprietary command set beneath it.
+
+### Worked example: text-buffer mutation & undo
+
+* **Specialized (bad):** `backspace(Cursor)`, `delete(Cursor)`, `deleteSelection(Selection)`—each called from one UI trigger, leaking `Cursor`/`Selection` into the engine.
+* **General (good):** `insert(Position, String)`, `delete(Position start, Position end)`, `changePosition(Position, int)`. All UI keys compose from these two; batch scripts and find-replace reuse the same buffer unchanged.
+* **Undo:** don't bake undo into `Text`. Extract a general `History` (steps actions, `addFence()` groups them) with specialized `Action` leaves (`UndoableInsert`, `UndoableDelete`). It is fine for a module to host special-purpose actions *for itself*.
+
+### Eliminate special cases in code
+
+Nested `if`s and state flags around edge cases are bug magnets. **Design the normal case so it subsumes the edge case.** Keep a selection that *always exists*—represent "nothing selected" as an empty selection (`start == end`); copy/delete then extract a 0-length range with no `if (hasSelection)` branch at all.
+
+### Evaluation: three questions
+
+1. **What is the simplest interface that covers all current needs?** Fewer, more capable methods (without bloated parameters) signal a deeper API.
+2. **In how many distinct situations will this method be used?** A method serving exactly one caller or one UI trigger is an over-specialization red flag.
+3. **Is this easy for current needs?** If callers must write loops or translation wrappers for ordinary tasks, you have over-generalized into lowest-common-denominator primitives.
+
+**Chapter 6 takeaway:** prefer general-purpose interfaces built from domain primitives, push specialization to the application layer or to leaf adapters, and let the normal case absorb edge cases.
+
+---
+
+## 11. Practical Review Checklist & Complexity Heuristics
 
 Before merging any pull request or finishing a task, verify against this combined checklist:
 
@@ -426,3 +571,10 @@ Before merging any pull request or finishing a task, verify against this combine
 | **Common Case Simple** | Does ordinary use require chaining wrappers, extra flags, or remembering optional steps? | Make the common path the default; isolate edge cases. |
 | **Classitis** | Did you split a class/method only to keep line counts small, adding names and glue? | Merge into a deeper module with one simple interface. |
 | **False Abstraction** | Does the interface omit important constraints (ordering, durability, side effects)? | Expose the important details; hide only the unimportant. |
+| **Information Hiding** | Does a `private` field still leak through a getter/setter or pass-through method? | Return a high-level domain operation instead of the internal representation. |
+| **Knowledge Leakage** | Will changing one format/decision force synchronized edits across several classes? | Merge the coupled classes or extract the shared knowledge into one owner. |
+| **Temporal Decomposition** | Are classes split by execution order (`Reader→Parser→Writer`) so format knowledge repeats? | Re-decompose around knowledge ownership; keep read+write of a format together. |
+| **Sensible Defaults** | Does ordinary use force callers to pass config or know rare mechanisms? | Provide defaults that do the right thing; isolate overrides behind optional methods. |
+| **Over-Specialization** | Does a method exist for exactly one caller or mirror a single UI trigger (`backspace()`)? | Replace it with general-purpose domain primitives (`delete(start, end)`). |
+| **Speculative Generality** | Did you build features or micro-op APIs for needs that don't exist yet? | Implement only today's functionality; keep the interface general, not the features. |
+| **Special-Case Flags** | Are there `if (isEmpty)` / `if (hasSelection)` branches that a model could absorb? | Model the empty/edge state as a valid normal state and drop the branch. |
