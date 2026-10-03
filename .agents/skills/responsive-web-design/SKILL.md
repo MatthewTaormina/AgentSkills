@@ -18,8 +18,13 @@ This skill provides an authoritative operational framework for responsive web de
 Agents must apply these rules whenever creating or modifying web pages, HTML templates, CSS layout, embedded media, or markup under review.
 
 ### Detailed References
-* [Responsive Design Foundations and Breakpoints](./references/responsive-design-foundations-and-breakpoints.md) (*Chapter 1 — The Essentials of Responsive Web Design*)
-* [Semantic HTML Markup and Media](./references/semantic-html-markup-and-media.md) (*Chapter 2 — Writing HTML Markup*)
+* [Foundations & Browser Support Strategy](./references/foundations-and-browser-support.md) — *RWD definition, three pillars, mobile-first progressive enhancement, device landscape, browser support economics (ROI rule), tooling, and AI discipline.*
+* [Viewport Mechanics & Media Queries](./references/viewport-and-media-queries.md) — *Viewport meta tag mechanics, 980px canvas dilemma, content-driven breakpoints, Anti-Device Rule, and media query syntax.*
+* [HTML Boilerplate, Syntax & Foundations](./references/html-boilerplate-and-syntax.md) — *Standard document template, doctype, lang, 14 void elements, HTML5 block-level `<a>` wrapping, and Unicode in HTML/CSS.*
+* [Semantic Sectioning, Structure & Grouping](./references/semantic-sectioning-and-structure.md) — *Sectioning tags (`<main>`, `<section>`, `<nav>`, `<article>`, `<aside>`, `<header>`, `<footer>`), heading hierarchy & `<hgroup>`, grouping elements, and the Scone O'Clock layout case study.*
+* [Embedded & Fluid Media](./references/embedded-and-fluid-media.md) — *Fluid images (`max-width: 100%`), native `<video>` and `<audio>`, multi-codec `<source>` with MIME types, modern `aspect-ratio` for `<iframe>` embeds, and native lazy loading.*
+* [Native Popups & Modals: The `<dialog>` Element](./references/native-dialogs-and-modals.md) — *Accessible native modals with `showModal()`, focus trapping, inert background, `::backdrop` styling, `<form method="dialog">`, and the button `type="button"` gotcha.*
+* [Accessibility Standards & Review Checklists](./references/accessibility-and-review-checklists.md) — *WCAG conformance tiers, WAI-ARIA guidelines, accessibility testing tools, rwd.education layout blueprint, and the master 25-point review checklist.*
 
 > [!NOTE]
 > **Regulatory and component-level accessibility compliance** (AODA, WCAG 2.1/2.2 Level AA criteria, live regions, contrast) is owned by the sibling `accessibility` skill. This skill covers the *markup and layout* foundations that make those criteria achievable in the first place.
