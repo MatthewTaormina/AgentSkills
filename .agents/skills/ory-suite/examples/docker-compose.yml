@@ -1,0 +1,148 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Shared PostgreSQL Database
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ory-postgres
+    environment:
+      POSTGRES_USER: ory
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_MULTIPLE_DATABASES: kratos,hydra,keto
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-postgres.sh:/docker-entrypoint-initdb.d/init-postgres.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ory"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # MailSlurper: Local SMTP Server & Web UI for Email Verification / Recovery
+  # ============================================================================
+  mailslurper:
+    image: oryd/mailslurper:smtps-latest
+    container_name: ory-mailslurper
+    ports:
+      - "4436:4436" # Web UI
+      - "1025:1025" # SMTP port
+
+  # ============================================================================
+  # Ory Kratos: Identity, Authentication & User Management
+  # ============================================================================
+  kratos-migrate:
+    image: oryd/kratos:v1.3.0
+    container_name: ory-kratos-migrate
+    environment:
+      DSN: postgres://ory:secretpassword@postgres:5432/kratos?sslmode=disable
+    command: -c /etc/config/kratos/kratos.yml migrate sql -e --yes
+    volumes:
+      - ./config/kratos:/etc/config/kratos
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  kratos:
+    image: oryd/kratos:v1.3.0
+    container_name: ory-kratos
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+      mailslurper:
+        condition: service_started
+    ports:
+      - "4433:4433" # Public API
+      - "4434:4434" # Admin API
+    environment:
+      DSN: postgres://ory:secretpassword@postgres:5432/kratos?sslmode=disable
+      LOG_LEVEL: debug
+    command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
+    volumes:
+      - ./config/kratos:/etc/config/kratos
+
+  # ============================================================================
+  # Ory Hydra: OAuth 2.0 & OpenID Connect Authorization Server
+  # ============================================================================
+  hydra-migrate:
+    image: oryd/hydra:v2.2.0
+    container_name: ory-hydra-migrate
+    environment:
+      DSN: postgres://ory:secretpassword@postgres:5432/hydra?sslmode=disable
+    command: -c /etc/config/hydra/hydra.yml migrate sql -e --yes
+    volumes:
+      - ./config/hydra:/etc/config/hydra
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  hydra:
+    image: oryd/hydra:v2.2.0
+    container_name: ory-hydra
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "4444:4444" # Public OAuth2 / OIDC API
+      - "4445:4445" # Admin API (Clients, Login & Consent)
+    environment:
+      DSN: postgres://ory:secretpassword@postgres:5432/hydra?sslmode=disable
+      SECRETS_SYSTEM: secret_system_token_needs_to_be_at_least_32_characters_long
+      URLS_SELF_ISSUER: http://localhost:4444/
+    command: serve all -c /etc/config/hydra/hydra.yml --dev
+    volumes:
+      - ./config/hydra:/etc/config/hydra
+
+  # ============================================================================
+  # Ory Keto: Fine-Grained Authorization & Zanzibar ReBAC
+  # ============================================================================
+  keto-migrate:
+    image: oryd/keto:v0.11.0
+    container_name: ory-keto-migrate
+    environment:
+      DSN: postgres://ory:secretpassword@postgres:5432/keto?sslmode=disable
+    command: -c /etc/config/keto/keto.yml migrate up -e -y
+    volumes:
+      - ./config/keto:/etc/config/keto
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  keto:
+    image: oryd/keto:v0.11.0
+    container_name: ory-keto
+    depends_on:
+      keto-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "4466:4466" # Read API (Check & Expand)
+      - "4467:4467" # Write API (Mutate Relation Tuples)
+    environment:
+      DSN: postgres://ory:secretpassword@postgres:5432/keto?sslmode=disable
+    command: serve -c /etc/config/keto/keto.yml
+    volumes:
+      - ./config/keto:/etc/config/keto
+
+  # ============================================================================
+  # Ory Oathkeeper: Zero-Trust Identity & Access Proxy / Decision Gateway
+  # ============================================================================
+  oathkeeper:
+    image: oryd/oathkeeper:v0.40.0
+    container_name: ory-oathkeeper
+    depends_on:
+      - kratos
+      - hydra
+      - keto
+    ports:
+      - "4455:4455" # Reverse Proxy port
+      - "4456:4456" # Decision API port
+    command: serve proxy -c /etc/config/oathkeeper/oathkeeper.yml
+    volumes:
+      - ./config/oathkeeper:/etc/config/oathkeeper
+
+volumes:
+  postgres_data:
